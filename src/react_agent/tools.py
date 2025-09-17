@@ -748,6 +748,116 @@ MIME-тип: {mime_type}
         return f"Ошибка в обработчике DOCX файлов: {str(e)}"
 
 
+@tool
+async def cloud_file_processor(input_data: str) -> str:
+    """
+    Специальный обработчик файлов для облачной среды LangGraph Platform.
+    Принимает сырые данные из облака и обрабатывает файлы любого типа.
+    
+    Args:
+        input_data: Сырые данные файла из облачной среды (JSON, base64, binary, text)
+    """
+    try:
+        import json
+        import base64
+        import tempfile
+        import os
+        
+        # Debug: показываем что получили
+        debug_info = f"🔍 DEBUG: Тип входных данных: {type(input_data)}\n"
+        debug_info += f"📊 Размер данных: {len(str(input_data))}\n"
+        debug_info += f"📝 Начало данных: {str(input_data)[:100]}...\n\n"
+        
+        # Пытаемся распарсить как JSON
+        file_info = {}
+        content = ""
+        
+        if isinstance(input_data, str):
+            # Проверяем, это JSON?
+            if input_data.strip().startswith('{'):
+                try:
+                    parsed = json.loads(input_data)
+                    file_info = parsed
+                    content = parsed.get('content', parsed.get('data', ''))
+                except:
+                    # Если не JSON, считаем это содержимым файла
+                    content = input_data
+            else:
+                content = input_data
+        
+        # Извлекаем метаданные файла
+        filename = file_info.get('name', file_info.get('filename', 'uploaded_file'))
+        mime_type = file_info.get('type', file_info.get('mime_type', 'application/octet-stream'))
+        
+        # Если MIME-тип указывает на DOCX или PDF
+        if 'vnd.openxmlformats-officedocument.wordprocessingml.document' in mime_type:
+            file_extension = '.docx'
+        elif 'application/pdf' in mime_type:
+            file_extension = '.pdf'
+        elif 'text/' in mime_type:
+            file_extension = '.txt'
+        else:
+            file_extension = '.bin'
+        
+        debug_info += f"📁 Имя файла: {filename}\n"
+        debug_info += f"🔤 MIME-тип: {mime_type}\n"
+        debug_info += f"📎 Расширение: {file_extension}\n\n"
+        
+        # Создаем временный файл для обработки
+        with tempfile.NamedTemporaryFile(suffix=file_extension, delete=False) as temp_file:
+            temp_path = temp_file.name
+            
+            if file_extension in ['.txt']:
+                # Текстовые файлы
+                temp_file.write(content.encode('utf-8'))
+            else:
+                # Бинарные файлы - пытаемся декодировать из base64
+                try:
+                    # Если это массив байтов
+                    if isinstance(content, list):
+                        binary_data = bytes(content)
+                    # Если это base64 строка
+                    elif isinstance(content, str):
+                        # Убираем префикс data:
+                        if 'base64,' in content:
+                            content = content.split('base64,')[1]
+                        binary_data = base64.b64decode(content)
+                    else:
+                        binary_data = str(content).encode('utf-8')
+                    
+                    temp_file.write(binary_data)
+                    debug_info += f"✅ Файл декодирован, размер: {len(binary_data)} байт\n\n"
+                except Exception as decode_error:
+                    debug_info += f"❌ Ошибка декодирования: {str(decode_error)}\n\n"
+                    return debug_info + "Не удалось декодировать файл"
+        
+        try:
+            # Анализируем файл
+            if file_extension == '.docx':
+                result = await analyze_docx_file(temp_path)
+            elif file_extension == '.pdf':
+                result = await analyze_pdf_file(temp_path)
+            else:
+                with open(temp_path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+                result = f"Содержимое файла:\n{file_content[:1000]}"
+            
+            return debug_info + f"📋 РЕЗУЛЬТАТ АНАЛИЗА:\n{result}"
+            
+        except Exception as analysis_error:
+            return debug_info + f"❌ Ошибка анализа: {str(analysis_error)}"
+        
+        finally:
+            # Удаляем временный файл
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+                
+    except Exception as e:
+        return f"🚨 КРИТИЧЕСКАЯ ОШИБКА в cloud_file_processor: {str(e)}"
+
+
 async def universal_file_handler(**kwargs) -> str:
     """Универсальный обработчик всех типов файлов.
     
@@ -905,5 +1015,6 @@ TOOLS: List[Callable[..., Any]] = [
     handle_file_content,
     handle_docx_content,
     universal_file_handler,
-    process_any_content_type
+    process_any_content_type,
+    cloud_file_processor
 ]
