@@ -43,13 +43,14 @@
 OPENAI_API_KEY=sk-proj-your_openai_key_here
 TAVILY_API_KEY=tvly-dev-your_tavily_key_here
 LANGSMITH_API_KEY=lsv2_pt_your_langsmith_key_here
-LANGCHAIN_TRACING_V2=true
 LANGSMITH_PROJECT=react-tender-agent
 ```
 
-**⚠️ Важно**: 
-- НЕ используйте `LANGCHAIN_API_KEY` - эта переменная зарезервирована!
-- Используйте только `LANGSMITH_API_KEY` для LangSmith
+**⚠️ Важно - ЗАРЕЗЕРВИРОВАННЫЕ переменные**: 
+- НЕ используйте `LANGCHAIN_API_KEY` - зарезервирована!
+- НЕ используйте `LANGCHAIN_TRACING_V2` - зарезервирована!
+- НЕ используйте `LANGCHAIN_PROJECT` - зарезервирована!
+- Используйте только `LANGSMITH_API_KEY` и `LANGSMITH_PROJECT`
 - Замените плейсхолдеры на свои реальные API ключи
 
 ### 6. Deploy!
